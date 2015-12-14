@@ -22,7 +22,7 @@ function varargout = vocab_train(varargin)
 
 % Edit the above text to modify the response to help vocab_train
 
-% Last Modified by GUIDE v2.5 13-Dec-2015 19:01:27
+% Last Modified by GUIDE v2.5 14-Dec-2015 20:24:42
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -108,6 +108,27 @@ function vocab_browser_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns vocab_browser contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from vocab_browser
 
+contents = cellstr(get(hObject,'String'));
+indices = get(hObject,'Value');
+
+temp_names = fieldnames(handles.vocab);
+vocab = [];
+for it = 1:numel(indices)
+    vocab_list = contents{indices(it)};
+    vocab = [vocab; handles.vocab.(temp_names{1}).(vocab_list)];
+end
+
+% check for empty elements, TODO: create warning dialogue instead of assert
+emptyCells = cellfun('isempty',vocab);
+assert(~any(any(emptyCells)),'At least one element of vocabulary matrix is empty!');
+
+handles.vocab_matrix = vocab;
+handles = reset_train_panel(handles);
+set(handles.next_vocab_btn,'Enable','on');
+
+% Update handles structure
+guidata(hObject, handles);
+
 
 % --- Executes during object creation, after setting all properties.
 function vocab_browser_CreateFcn(hObject, eventdata, handles)
@@ -151,20 +172,45 @@ function next_vocab_btn_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+if ~handles.train_panel_prepared
+    handles = prepare_train_panel(handles); 
+end
 
+switch(handles.train_mode)
+    case 'next'
+        handles.train_mode = 'solve';
+        handles.current_vocab = get_next_vocab(handles);
+        temp_cell = handles.current_vocab(1);
+        set(handles.ger_vocab_txt,'String',temp_cell{1});
+        set(handles.next_vocab_btn,'String','Solve!');
+        
+    case 'solve'
+        handles.train_mode = 'next';
+        temp_cell = handles.current_vocab(2);
+        set(handles.roma_vocab_txt,'String',temp_cell{1});
+        set(handles.next_vocab_btn,'String','Next!');
+        handles.train_panel_prepared = false;
+        
+    otherwise
+        assert(false, sprintf('Train mode "%s" was not specified!', handles.train_mode));
+end
 
-function roma_vocab_text_Callback(hObject, eventdata, handles)
-% hObject    handle to roma_vocab_text (see GCBO)
+% Update handles structure
+guidata(hObject, handles);
+    
+
+function roma_vocab_txt_Callback(hObject, eventdata, handles)
+% hObject    handle to roma_vocab_txt (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of roma_vocab_text as text
-%        str2double(get(hObject,'String')) returns contents of roma_vocab_text as a double
+% Hints: get(hObject,'String') returns contents of roma_vocab_txt as text
+%        str2double(get(hObject,'String')) returns contents of roma_vocab_txt as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function roma_vocab_text_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to roma_vocab_text (see GCBO)
+function roma_vocab_txt_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to roma_vocab_txt (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -176,18 +222,18 @@ end
 
 
 
-function sym_vocab_text_Callback(hObject, eventdata, handles)
-% hObject    handle to sym_vocab_text (see GCBO)
+function sym_vocab_txt_Callback(hObject, eventdata, handles)
+% hObject    handle to sym_vocab_txt (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hints: get(hObject,'String') returns contents of sym_vocab_text as text
-%        str2double(get(hObject,'String')) returns contents of sym_vocab_text as a double
+% Hints: get(hObject,'String') returns contents of sym_vocab_txt as text
+%        str2double(get(hObject,'String')) returns contents of sym_vocab_txt as a double
 
 
 % --- Executes during object creation, after setting all properties.
-function sym_vocab_text_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to sym_vocab_text (see GCBO)
+function sym_vocab_txt_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to sym_vocab_txt (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
@@ -268,3 +314,66 @@ temp_names = fieldnames(handles.vocab);
 vocab_list = fieldnames(handles.vocab.(temp_names{1}));
 
 set(handles.vocab_browser,'string',vocab_list);
+
+function handles = reset_train_panel(handles)
+%erases train panel entries, sets btn string to 'Start!'
+
+set(handles.next_vocab_btn,'String','Start!');
+set(handles.next_vocab_btn,'Enable','off');
+
+set(handles.ger_vocab_txt,'String','German');
+set(handles.ger_vocab_txt,'ForegroundColor',[0.5,0.5,0.5]);
+set(handles.ger_vocab_txt,'FontSize',8.0);
+
+set(handles.roma_vocab_txt,'String','Japanese (Romaji)');
+set(handles.roma_vocab_txt,'ForegroundColor',[0.5,0.5,0.5]);
+set(handles.roma_vocab_txt,'FontSize',8.0);
+
+set(handles.sym_vocab_txt,'String','Japanese (Symbols)');
+set(handles.sym_vocab_txt,'ForegroundColor',[0.5,0.5,0.5]);
+set(handles.sym_vocab_txt,'FontSize',8.0);
+
+handles.current_vocab = {};
+handles.train_mode = '';
+handles.train_panel_prepared = false;
+
+
+function handles = prepare_train_panel(handles)
+%empties text boxes and sets color to black
+
+set(handles.ger_vocab_txt,'String','');
+set(handles.ger_vocab_txt,'ForegroundColor',[0,0,0]);
+set(handles.ger_vocab_txt,'FontSize',14.0);
+
+set(handles.roma_vocab_txt,'String','');
+set(handles.roma_vocab_txt,'ForegroundColor',[0,0,0]);
+set(handles.roma_vocab_txt,'FontSize',14.0);
+
+set(handles.sym_vocab_txt,'String','');
+set(handles.sym_vocab_txt,'ForegroundColor',[0,0,0]);
+set(handles.sym_vocab_txt,'FontSize',14.0);
+
+handles.current_vocab = {};
+handles.train_mode = 'next';
+handles.train_panel_prepared = true;
+
+
+% --- Executes during object creation, after setting all properties.
+function train_pan_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to train_pan (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+handles.train_panel_prepared = false;
+handles.train_mode = '';
+handles.current_vocab = {};
+
+% Update handles structure
+guidata(hObject, handles);
+
+
+function next_vocab = get_next_vocab(handles)
+%randomly chooses vocab from vocab matrix
+
+index = floor(rand * numel(handles.vocab_matrix(:,1))) + 1;
+next_vocab = {handles.vocab_matrix(index,1), handles.vocab_matrix(index,2)};    %TODO add 3rd property
