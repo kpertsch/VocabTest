@@ -55,6 +55,16 @@ function vocab_train_OpeningFcn(hObject, eventdata, handles, varargin)
 % Choose default command line output for vocab_train
 handles.output = hObject;
 
+% Create look-up map for hiragana unicodes from prog_dat
+lookup_table = load('prog_dat.mat', 'hiragana_unicode');
+
+keySet={}; valueSet={};
+for i=1:numel(lookup_table.hiragana_unicode(:,1))
+    keySet = [keySet, lookup_table.hiragana_unicode(i,1)];
+    valueSet = [valueSet, lookup_table.hiragana_unicode(i,2)];
+end
+handles.hira_unicode_map = containers.Map(keySet, valueSet);
+
 % Update handles structure
 guidata(hObject, handles);
 
@@ -404,10 +414,10 @@ function handles = set_symbol(handles, vocab)
 
 switch handles.mode 
     case 'hiragana'
-        unicode_str = str2hiragana(vocab);
+        unicode_str = str2hiragana(vocab{1}, handles);
         
     case 'kanji'
-        unicode_str = str2kanji(vocab);
+        unicode_str = str2kanji(vocab{1}, handles);
         
     otherwise
         assert(false,'GUI is in undefined mode!');
@@ -415,7 +425,29 @@ end
 
 set(handles.sym_vocab_txt,'String',sprintf('<HTML><FONT SIZE=14>%s</HTML>', unicode_str));
 
-function unicode_str = str2hiragana(vocab)
-%converts romaji string to unicode characters
+function unicode_str = str2hiragana(vocab, handles)
+%converts romaji string to hiragana unicode characters
+
+lookup_map = handles.hira_unicode_map;
+
+unicode_str=[];
+while ~isempty(vocab)
+    sub_str = vocab(1:(min(numel(vocab),4)));       % longest hiragana romaji snippet is 4 char long
+    while(1)
+       if isempty(sub_str)
+          assert(false, sprintf('symbol not found while converting %s to hiragana unicode', handles.current_vocab));
+       end
+       
+       if isKey(lookup_map, sub_str)
+           unicode_str = [unicode_str, lookup_map(sub_str)];
+           break;
+       else
+           sub_str = sub_str(1:(end-1));
+       end
+    end
+    vocab = vocab((numel(sub_str)+1):end);
+end
 
 
+function unicode_str = str2kanji(vocab, handles)
+%converts romaji string to kanji unicode characters via lookup-table
