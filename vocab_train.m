@@ -22,7 +22,7 @@ function varargout = vocab_train(varargin)
 
 % Edit the above text to modify the response to help vocab_train
 
-% Last Modified by GUIDE v2.5 14-Dec-2015 20:24:42
+% Last Modified by GUIDE v2.5 18-Dec-2015 18:21:49
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -451,3 +451,51 @@ end
 
 function unicode_str = str2kanji(vocab, handles)
 %converts romaji string to kanji unicode characters via lookup-table
+
+
+% --- Executes on button press in edit_vocab_file_btn.
+function edit_vocab_file_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_vocab_file_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+filepath = get(handles.edit_vocab_filepath,'String');
+if (exist(filepath, 'file') == 2 && any(regexp(filepath,'.mat$')))  %check if valid file path
+    
+    vars = whos('-file',filepath);
+    if ismember('vocab_hiragana', {vars.name}) || ismember('vocab_kanji', {vars.name})
+        set(handles.edit_status_info,'string','Start vocabulary editor GUI!');
+        % TODO: write vocab editor GUI
+    else
+        set(handles.edit_status_info,'string',['File contains no field of name "vocab_hiragana"'...
+            ' or "vocab_kanji", please choose a different file!']);
+    end
+    
+else
+    set(handles.edit_status_info,'string','Edit failed, please enter full .mat-file path!');
+end
+
+% Update handles structure
+guidata(hObject, handles);
+
+
+function edit_vocab_filepath_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_vocab_filepath (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_vocab_filepath as text
+%        str2double(get(hObject,'String')) returns contents of edit_vocab_filepath as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_vocab_filepath_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_vocab_filepath (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
