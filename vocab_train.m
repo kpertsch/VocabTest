@@ -189,6 +189,7 @@ switch(handles.train_mode)
         temp_cell = handles.current_vocab(2);
         set(handles.roma_vocab_txt,'String',temp_cell{1});
         set(handles.next_vocab_btn,'String','Next!');
+        handles = set_symbol(handles, temp_cell{1});
         handles.train_panel_prepared = false;
         
     otherwise
@@ -229,6 +230,10 @@ function sym_vocab_txt_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of sym_vocab_txt as text
 %        str2double(get(hObject,'String')) returns contents of sym_vocab_txt as a double
+%handles.sym_txt_obj = hObject;
+
+
+
 
 
 % --- Executes during object creation, after setting all properties.
@@ -243,6 +248,14 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
+% customize to make button look like textbox
+jEdit = findjobj(hObject);
+lineColor = java.awt.Color(0.7,0.7,0.7);
+thickness = 1;  % pixels
+roundedCorners = false;
+newBorder = javax.swing.border.LineBorder(lineColor,thickness,roundedCorners);
+jEdit.Border = newBorder;
+jEdit.repaint;  % redraw the modified control
 
 
 function filename_input_txt_Callback(hObject, eventdata, handles)
@@ -333,6 +346,10 @@ set(handles.sym_vocab_txt,'String','Japanese (Symbols)');
 set(handles.sym_vocab_txt,'ForegroundColor',[0.5,0.5,0.5]);
 set(handles.sym_vocab_txt,'FontSize',8.0);
 
+jh = findjobj(handles.sym_vocab_txt);
+jh.setVerticalAlignment( javax.swing.SwingConstants.CENTER );
+jh.repaint
+
 handles.current_vocab = {};
 handles.train_mode = '';
 handles.train_panel_prepared = false;
@@ -352,6 +369,10 @@ set(handles.roma_vocab_txt,'FontSize',14.0);
 set(handles.sym_vocab_txt,'String','');
 set(handles.sym_vocab_txt,'ForegroundColor',[0,0,0]);
 set(handles.sym_vocab_txt,'FontSize',14.0);
+
+jh = findjobj(handles.sym_vocab_txt);
+jh.setVerticalAlignment( javax.swing.SwingConstants.BOTTOM );
+jh.repaint
 
 handles.current_vocab = {};
 handles.train_mode = 'next';
@@ -377,3 +398,24 @@ function next_vocab = get_next_vocab(handles)
 
 index = floor(rand * numel(handles.vocab_matrix(:,1))) + 1;
 next_vocab = {handles.vocab_matrix(index,1), handles.vocab_matrix(index,2)};    %TODO add 3rd property
+
+function handles = set_symbol(handles, vocab)
+%sets symbol in symbol text box
+
+switch handles.mode 
+    case 'hiragana'
+        unicode_str = str2hiragana(vocab);
+        
+    case 'kanji'
+        unicode_str = str2kanji(vocab);
+        
+    otherwise
+        assert(false,'GUI is in undefined mode!');
+end
+
+set(handles.sym_vocab_txt,'String',sprintf('<HTML><FONT SIZE=14>%s</HTML>', unicode_str));
+
+function unicode_str = str2hiragana(vocab)
+%converts romaji string to unicode characters
+
+
