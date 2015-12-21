@@ -43,6 +43,7 @@ else
 end
 % End initialization code - DO NOT EDIT
 
+%TODO: Tooltips
 
 % --- Executes just before vocab_train is made visible.
 function vocab_train_OpeningFcn(hObject, eventdata, handles, varargin)
