@@ -22,7 +22,7 @@ function varargout = edit_vocab(varargin)
 
 % Edit the above text to modify the response to help edit_vocab
 
-% Last Modified by GUIDE v2.5 21-Dec-2015 14:16:14
+% Last Modified by GUIDE v2.5 21-Dec-2015 18:44:15
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -131,41 +131,40 @@ function varargout = edit_vocab_OutputFcn(hObject, eventdata, handles)
 varargout{1} = handles.output;
 
 
-% --- Executes on selection change in vocab_listbox.
-function vocab_listbox_Callback(hObject, eventdata, handles)
-% hObject    handle to vocab_listbox (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns vocab_listbox contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from vocab_listbox
-
-
-% --- Executes during object creation, after setting all properties.
-function vocab_listbox_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to vocab_listbox (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: listbox controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
 % --- Executes on button press in add_btn.
 function add_btn_Callback(hObject, eventdata, handles)
 % hObject    handle to add_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+data = get(handles.vocab_table,'data');
+set(handles.vocab_table,'data',[data;[{''},{''}]]);
+
+handles.vocab.(['vocab_',handles.mode]).(handles.vocab_list) = ...
+    [handles.vocab.(['vocab_',handles.mode]).(handles.vocab_list) ; [{''},{''}]];
+
+% Update handles structure
+guidata(hObject, handles);
 
 % --- Executes on button press in remove_btn.
 function remove_btn_Callback(hObject, eventdata, handles)
 % hObject    handle to remove_btn (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+del_row = handles.selected_table_row;
+
+data = get(handles.vocab_table,'data');
+set(handles.vocab_table,'data',[data((1:del_row-1),:) ; data((del_row+1:end),:)]);
+
+temp_vocab = handles.vocab.(['vocab_',handles.mode]).(handles.vocab_list);
+handles.vocab.(['vocab_',handles.mode]).(handles.vocab_list) = ...
+    [temp_vocab((1:del_row-1),:) ; temp_vocab((del_row+1:end),:)];
+
+save_vocab_to_file(handles);
+
+% Update handles structure
+guidata(hObject, handles);
 
 
 % --- Executes on selection change in vocab_set_list.
@@ -181,16 +180,13 @@ contents = cellstr(get(hObject,'String'));
 indices = get(hObject,'Value');
 
 temp_names = fieldnames(handles.vocab);
-vocab_str = [];
-for it = 1:numel(indices)
-    vocab_list = contents{indices(it)};
-    vocab = handles.vocab.(temp_names{1}).(vocab_list);
-    for i=1:numel(vocab(:,1))
-        vocab_str = [vocab_str; {strjoin([vocab(i,1),{' : '},vocab(i,2)])}];
-    end
-end
+handles.vocab_list = contents{indices(1)};
+vocab = handles.vocab.(temp_names{1}).(handles.vocab_list);
 
-set(handles.vocab_listbox,'string',cellstr(vocab_str));
+set(handles.vocab_table,'data',vocab,'enable','on');
+set(handles.add_btn,'enable','on');
+set(handles.remove_btn,'enable','on');
+%set(handles.delete_set_btn,'enable','on');
 
 % Update handles structure
 guidata(hObject, handles);
@@ -248,12 +244,16 @@ guidata(hObject, handles);
 function handles = reset_GUI(handles)
 %resets all GUI elements after mode change
 
-set(handles.ger_edit_txt,'enable','inactive','string','German',...
-    'ForegroundColor',[0.5,0.5,0.5]);
-set(handles.roma_edit_txt,'enable','inactive','string','Japanese (Romaji)',...
-    'ForegroundColor',[0.5,0.5,0.5]);
+set(handles.vocab_set_list,'string',{''});
+set(handles.add_btn,'enable','off');
+set(handles.remove_btn,'enable','off');
+set(handles.delete_set_btn,'enable','off');
 
-set(handles.vocab_listbox,'String','No Vocabulary Set Chosen!');
+handles.vocab = struct;
+handles.vocab_list = [];
+handles.selected_table_row = -1;
+
+set(handles.vocab_table,'data',{'',''},'enable','inactive');
 
 
 
@@ -300,3 +300,97 @@ function roma_edit_txt_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes when entered data in editable cell(s) in vocab_table.
+function vocab_table_CellEditCallback(hObject, eventdata, handles)
+% hObject    handle to vocab_table (see GCBO)
+% eventdata  structure with the following fields (see UITABLE)
+%	Indices: row and column indices of the cell(s) edited
+%	PreviousData: previous data for the cell(s) edited
+%	EditData: string(s) entered by the user
+%	NewData: EditData or its converted form set on the Data property. Empty if Data was not changed
+%	Error: error string when failed to convert EditData to appropriate value for Data
+% handles    structure with handles and user data (see GUIDATA)
+
+handles = update_vocab_data(eventdata.Indices,eventdata.EditData,handles);
+
+% Update handles structure
+guidata(hObject, handles);
+
+function handles = update_vocab_data(indices,new_vocab,handles)
+%writes changes in vocab table to handles.vocab and saves to file
+
+handles.vocab.(['vocab_',handles.mode]).(handles.vocab_list)(indices(1),indices(2)) = {new_vocab};
+save_vocab_to_file(handles);
+
+
+function save_vocab_to_file(handles)
+S.(['vocab_',handles.mode]) = handles.vocab.(['vocab_',handles.mode]);
+save(handles.filepath, '-struct', 'S');      % hack to save with desired name
+
+
+% --- Executes when selected cell(s) is changed in vocab_table.
+function vocab_table_CellSelectionCallback(hObject, eventdata, handles)
+% hObject    handle to vocab_table (see GCBO)
+% eventdata  structure with the following fields (see UITABLE)
+%	Indices: row and column indices of the cell(s) currently selecteds
+% handles    structure with handles and user data (see GUIDATA)
+
+if(~isempty(eventdata.Indices))
+    handles.selected_table_row = eventdata.Indices(1);
+end
+
+% Update handles structure
+guidata(hObject, handles);
+
+
+% --- Executes on button press in new_set_btn.
+function new_set_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to new_set_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of new_set_btn
+
+prompt = {'Enter vocabulary set name:'};
+dlg_title = 'Set Name';
+num_lines = 1;
+defaultans = {'new_vocab_set'};
+set_name = inputdlg(prompt,dlg_title,num_lines,defaultans);
+
+handles.vocab.(['vocab_',handles.mode]) = setfield(handles.vocab.(['vocab_',handles.mode]), char(set_name), {});
+
+handles = fill_set_browser(['vocab_',handles.mode], handles);
+
+% Update handles structure
+guidata(hObject, handles);
+
+
+% --- Executes on button press in delete_set_btn.
+function delete_set_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to delete_set_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of delete_set_btn
+
+%TODO: implement creating new file
+qstring = sprintf('Do you really want to delete "%s"?',handles.vocab_list);
+choice = questdlg(qstring,'Vocabulary Set Deletion','Yes','No','No');
+
+switch choice
+    case 'Yes'
+        handles.vocab.(['vocab_',handles.mode]) = rmfield(handles.vocab.(['vocab_',handles.mode]),char(handles.vocab_list));
+        set(handles.vocab_set_list,'string',[],'value',[]);
+        set(handles.vocab_table,'data',[]);
+        % Update handles structure
+        guidata(hObject, handles);
+        
+        handles = fill_set_browser(['vocab_',handles.mode], handles);
+    case 'No'
+        % don't do anything
+end
+
+% Update handles structure
+guidata(hObject, handles);
