@@ -22,7 +22,7 @@ function varargout = vocab_train(varargin)
 
 % Edit the above text to modify the response to help vocab_train
 
-% Last Modified by GUIDE v2.5 18-Dec-2015 18:21:49
+% Last Modified by GUIDE v2.5 26-Dec-2015 15:26:52
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -466,7 +466,7 @@ if (exist(filepath, 'file') == 2 && any(regexp(filepath,'.mat$')))  %check if va
     vars = whos('-file',filepath);
     if ismember('vocab_hiragana', {vars.name}) || ismember('vocab_kanji', {vars.name})
         set(handles.edit_status_info,'string','Start vocabulary editor GUI!');
-        % TODO: write vocab editor GUI
+        edit_vocab(filepath);
     else
         set(handles.edit_status_info,'string',['File contains no field of name "vocab_hiragana"'...
             ' or "vocab_kanji", please choose a different file!']);
@@ -500,3 +500,37 @@ function edit_vocab_filepath_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in browse_edit_btn.
+function browse_edit_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to browse_edit_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+curr_dir = pwd;
+[filename, filepath] = uigetfile('*.mat','Vocabulary file selector',curr_dir);
+
+if(~(filename == 0))
+    set(handles.edit_vocab_filepath,'string',[filepath,filename]);
+end
+
+% Update handles structure
+guidata(hObject, handles);
+
+
+% --- Executes on button press in browse_import_btn.
+function browse_import_btn_Callback(hObject, eventdata, handles)
+% hObject    handle to browse_import_btn (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+curr_dir = pwd;
+[filename, filepath] = uigetfile('*.mat','Vocabulary file selector',curr_dir);
+
+if(~(filename == 0))
+    set(handles.filename_input_txt,'string',[filepath,filename]);
+end
+
+% Update handles structure
+guidata(hObject, handles);
