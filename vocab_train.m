@@ -22,7 +22,7 @@ function varargout = vocab_train(varargin)
 
 % Edit the above text to modify the response to help vocab_train
 
-% Last Modified by GUIDE v2.5 26-Dec-2015 15:26:52
+% Last Modified by GUIDE v2.5 07-Jan-2016 15:42:27
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -65,6 +65,8 @@ for i=1:numel(lookup_table.hiragana_unicode(:,1))
     valueSet = [valueSet, lookup_table.hiragana_unicode(i,2)];
 end
 handles.hira_unicode_map = containers.Map(keySet, valueSet);
+
+handles.progress_val_changed = false;
 
 % Update handles structure
 guidata(hObject, handles);
@@ -119,8 +121,13 @@ function vocab_browser_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns vocab_browser contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from vocab_browser
 
+handles = update_progress_values(handles);
+
 contents = cellstr(get(hObject,'String'));
 indices = get(hObject,'Value');
+
+handles.old_contents = contents;
+handles.old_indices = indices;
 
 temp_names = fieldnames(handles.vocab);
 vocab = [];
@@ -139,6 +146,45 @@ set(handles.next_vocab_btn,'Enable','on');
 
 % Update handles structure
 guidata(hObject, handles);
+
+function vocab = check_progress_values(vocab, filepath)
+% checks if saved user hash exists and fits current user hash, otherwise:
+% reset progress values
+
+current_hash = string2hash(getenv('USERNAME'),'djb2');
+
+vars = whos('-file',filepath);
+if ismember('user', {vars.name})
+    % check if user hashs are corresponding
+    user_struct = load(filepath,'user');
+    saved_hash = user_struct.user;
+    if ~bitxor(saved_hash,current_hash)
+        % hashes are equal
+        return
+    else
+        % override user hash and reset progress value
+        vocab = initialize_progress(vocab, filepath, current_hash);
+    end
+else 
+    % create new user field and initialize progress values
+    vocab = initialize_progress(vocab, filepath, current_hash);
+end
+
+function vocab = initialize_progress(vocab, filepath, current_hash)
+% overrides/creates user account and progress values
+
+user = current_hash;
+save(filepath,'user','-append');
+
+temp_names = fieldnames(vocab);
+vocab_lists = fieldnames(vocab.(temp_names{1}));
+for i = 1:numel(vocab_lists)
+    init_values = cell((numel(vocab.(temp_names{1}).(vocab_lists{i})(:,1))),1);
+    init_values(:) = {10};
+    vocab.(temp_names{1}).(vocab_lists{i})(:,3) = init_values';
+end
+eval([temp_names{1} '=vocab.(temp_names{1});']);
+save(filepath,temp_names{1},'-append');
 
 
 % --- Executes during object creation, after setting all properties.
@@ -190,7 +236,7 @@ end
 switch(handles.train_mode)
     case 'next'
         handles.train_mode = 'solve';
-        handles.current_vocab = get_next_vocab(handles);
+        handles.current_vocab = get_next_vocab(handles.vocab_matrix);
         temp_cell = handles.current_vocab(1);
         set(handles.ger_vocab_txt,'String',temp_cell{1});
         set(handles.next_vocab_btn,'String','Solve!');
@@ -307,12 +353,14 @@ else
 end
 
 filepath = get(handles.filename_input_txt,'String');
+handles.vocab_filepath = filepath;
 if (exist(filepath, 'file') == 2 && any(regexp(filepath,'.mat$')))  %check if valid file path
     
     vars = whos('-file',filepath);
     if ismember(VOCAB_FIELDNAME, {vars.name})
         reset_GUI();
         handles.vocab = load(filepath, VOCAB_FIELDNAME);
+        handles.vocab = check_progress_values(handles.vocab, filepath);
         handles = fill_vocab_browser(handles);
         set(handles.load_status_info,'string','Load finished successfully!');
     else
@@ -404,11 +452,15 @@ handles.current_vocab = {};
 guidata(hObject, handles);
 
 
-function next_vocab = get_next_vocab(handles)
+function next_vocab = get_next_vocab(vocab_matrix)
 %randomly chooses vocab from vocab matrix
 
-index = floor(rand * numel(handles.vocab_matrix(:,1))) + 1;
-next_vocab = {handles.vocab_matrix(index,1), handles.vocab_matrix(index,2)};    %TODO add 3rd property
+% weighted pick
+a = 1:numel(vocab_matrix(:,1));
+w = (cell2mat(vocab_matrix(:,3)))';
+index = a( sum( bsxfun(@ge, rand(1), cumsum(w./sum(w))), 2) + 1 );
+
+next_vocab = {vocab_matrix(index,1), vocab_matrix(index,2)};
 
 function handles = set_symbol(handles, vocab)
 %sets symbol in symbol text box
@@ -466,6 +518,7 @@ if (exist(filepath, 'file') == 2 && any(regexp(filepath,'.mat$')))  %check if va
     vars = whos('-file',filepath);
     if ismember('vocab_hiragana', {vars.name}) || ismember('vocab_kanji', {vars.name})
         set(handles.edit_status_info,'string','Start vocabulary editor GUI!');
+        handles = update_progress_values(handles);
         edit_vocab(filepath);
     else
         set(handles.edit_status_info,'string',['File contains no field of name "vocab_hiragana"'...
@@ -534,3 +587,76 @@ end
 
 % Update handles structure
 guidata(hObject, handles);
+
+
+% --- Executes on key press with focus on figure1 or any of its controls.
+function figure1_WindowKeyPressFcn(hObject, eventdata, handles)
+% hObject    handle to figure1 (see GCBO)
+% eventdata  structure with the following fields (see FIGURE)
+%	Key: name of the key that was pressed, in lower case
+%	Character: character interpretation of the key(s) that was pressed
+%	Modifier: name(s) of the modifier key(s) (i.e., control, shift) pressed
+% handles    structure with handles and user data (see GUIDATA)
+
+if(strcmp(handles.train_mode,'next'))
+    switch eventdata.Key
+        case {'1','2','3','4','5','6','7','8','9'}
+            % user rating -> save and push 'next' button
+            user_shift = 0;
+            eval(['user_shift = ', eventdata.Key, '-5;']);
+            
+            curr_vocab = handles.current_vocab{1};
+            ind_1 = find(strcmp(curr_vocab, handles.vocab_matrix(:,1)));
+            handles.vocab_matrix{ind_1,3} = min(max(1,(handles.vocab_matrix{ind_1,3} + user_shift)),25);
+            
+            handles.progress_val_changed = true;
+            
+            % Update handles structure
+            guidata(hObject, handles);
+            
+            next_vocab_btn_Callback(handles.next_vocab_btn,[],handles);
+            
+        case 'return'
+            next_vocab_btn_Callback(handles.next_vocab_btn,[],handles);
+        otherwise
+            return
+    end
+end
+
+if(strcmp(handles.train_mode,'solve') && strcmp(eventdata.Key,'return'))
+    next_vocab_btn_Callback(handles.next_vocab_btn,[],handles);
+end
+    
+function handles = update_progress_values(handles)
+% saves changed progress values to vocab file
+
+if(~handles.progress_val_changed)
+    return
+else
+    temp_names = fieldnames(handles.vocab);
+    temp_ind = 1;
+    for it = 1:numel(handles.old_indices)
+        vocab_list = handles.old_contents{handles.old_indices(it)};
+        num_elem = numel(handles.vocab.(temp_names{1}).(vocab_list)(:,1));
+        handles.vocab.(temp_names{1}).(vocab_list)(:,3) = ...
+            handles.vocab_matrix(temp_ind:(temp_ind+num_elem-1),3);
+        temp_ind = temp_ind + num_elem;
+    end
+    
+    eval([temp_names{1} '=handles.vocab.(temp_names{1});']);
+    save(handles.vocab_filepath,temp_names{1},'-append');
+    
+    handles.progress_val_changed = false;
+end
+
+
+% --- Executes when user attempts to close figure1.
+function figure1_CloseRequestFcn(hObject, eventdata, handles)
+% hObject    handle to figure1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+update_progress_values(handles);
+
+% Hint: delete(hObject) closes the figure
+delete(hObject);
